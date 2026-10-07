@@ -84,15 +84,14 @@ def plan-tree [root: string tree: record] {
 # The complete tree is validated before writing. Files and symlinks are
 # replaced; directories cannot be replaced by leaves. Filesystem failures
 # may leave earlier writes in place.
-#
-# Examples:
-#   {hello: "world", current: [link hello]} | nuon2dir
-#   {run: [script "#!/bin/sh\necho hello\n"]} | nuon2dir --root ./result
-#   open tree.nuon | nuon2dir --root ./result
+@example 'Create a file and a symbolic link' '{hello: "world", current: [link hello]} | nuon2dir'
+@example 'Create an executable file in a destination directory' '{run: [script "#!/bin/sh\necho hello\n"]} | nuon2dir --root ./result'
+@example 'Materialize a NUON file' 'open tree.nuon | nuon2dir --root ./result'
 export def main [
     --root: path = '.' # Destination directory, created if missing
-] {
+]: [record -> nothing, nothing -> nothing] {
     let tree = $in
+    # The nothing signature permits --help without input; execution needs a record.
     if (value-type $tree) != 'record' {
         error make {msg: 'nuon2dir expects a record as pipeline input'}
     }
