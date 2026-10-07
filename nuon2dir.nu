@@ -20,8 +20,21 @@ def exists-as [flag: string path: string] {
     $result.exit_code == 0
 }
 
+# Nu expands runs of three or more dots in any path component.
+def needs-literal-path [path: string] {
+    $path =~ '(^|/)\.{3,}(/|$)'
+}
+
 def entry-type [path: string] {
-    if (exists-as '-L' $path) { 'link' } else if (exists-as '-d' $path) {
+    if not (needs-literal-path $path) {
+        let type: any = ($path | path type)
+        match $type {
+            null => { 'missing' }
+            'dir' => { 'dir' }
+            'symlink' => { 'link' }
+            _ => { 'leaf' }
+        }
+    } else if (exists-as '-L' $path) { 'link' } else if (exists-as '-d' $path) {
         'dir'
     } else if (exists-as '-e' $path) { 'leaf' } else { 'missing' }
 }
@@ -33,7 +46,7 @@ def plan-tree [root: string tree: record] {
     while not ($todo | is-empty) {
         let job = ($todo | last)
         $todo = ($todo | drop 1)
-        for entry in ($job.tree | transpose name value) {
+        let nodes = ($job.tree | transpose name value | each {|entry|
             let name = $entry.name
             if (($name == '') or ($name == '.') or ($name == '..') or
                 ($name | str contains '/') or ($name | str contains (char nul))) {
@@ -45,11 +58,10 @@ def plan-tree [root: string tree: record] {
             let type = (value-type $value)
             match $type {
                 'record' => {
-                    $plan = ($plan | append {path: $path, kind: 'dir', payload: null})
-                    $todo = ($todo | append {path: $path, tree: $value})
+                    {path: $path, kind: 'dir', payload: $value}
                 }
                 'string' | 'binary' => {
-                    $plan = ($plan | append {path: $path, kind: 'file', payload: $value})
+                    {path: $path, kind: 'file', payload: $value}
                 }
                 'list' => {
                     if ($value | length) != 2 {
@@ -63,11 +75,20 @@ def plan-tree [root: string tree: record] {
                     if $kind not-in ['link' 'script'] {
                         error make {msg: $"nuon2dir: unknown node kind ($kind) at ($path)"}
                     }
-                    $plan = ($plan | append {path: $path, kind: $kind, payload: $payload})
+                    {path: $path, kind: $kind, payload: $payload}
                 }
                 _ => { error make {msg: $"nuon2dir: unsupported value type ($type) at ($path)"} }
             }
-        }
+        })
+        let children = ($nodes | where kind == 'dir' | each {|node|
+            {path: $node.path, tree: $node.payload}
+        })
+        $todo = ($todo | append $children)
+        # Collect a whole directory at once instead of copying the growing
+        # plan for every member. Directory payloads are only needed in todo.
+        $plan = ($plan | append ($nodes | update payload {|node|
+            if $node.kind == 'dir' { null } else { $node.payload }
+        }))
     }
     $plan
 }
@@ -104,21 +125,29 @@ export def main [
     if (entry-type $root) not-in ['dir' 'missing'] {
         error make {msg: $"nuon2dir: root is not a directory: ($root)"}
     }
-    checked 'mkdir' '-p' '--' $root
+    if (needs-literal-path $root) {
+        checked 'mkdir' '-p' '--' $root
+    } else { mkdir $root }
     for node in $plan {
         let existing = (entry-type $node.path)
         if $existing == 'dir' {
             if $node.kind == 'dir' { continue }
             error make {msg: $"nuon2dir: cannot replace directory with ($node.kind): ($node.path)"}
         }
-        if $existing != 'missing' { checked 'rm' '--' $node.path }
+        let literal = (needs-literal-path $node.path)
+        if $existing != 'missing' {
+            if $literal { checked 'rm' '--' $node.path } else { rm --permanent $node.path }
+        }
         match $node.kind {
-            'dir' => { checked 'mkdir' '--' $node.path }
+            'dir' => {
+                if $literal { checked 'mkdir' '--' $node.path } else { mkdir $node.path }
+            }
             'link' => { checked 'ln' '-s' '--' $node.payload $node.path }
             _ => {
-                # Fixed shell program, path passed as an argument. Both native
-                # strings and binary stream unchanged; no Nu path shorthand.
-                $node.payload | checked 'sh' '-c' 'cat > "$1"' 'nuon2dir' $node.path
+                if $literal {
+                    # Fixed shell program with the literal path passed as an argument.
+                    $node.payload | checked 'sh' '-c' 'cat > "$1"' 'nuon2dir' $node.path
+                } else { $node.payload | save --raw $node.path }
                 if $node.kind == 'script' { checked 'chmod' 'a+x' '--' $node.path }
             }
         }

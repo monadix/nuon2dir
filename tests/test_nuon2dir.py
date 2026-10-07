@@ -62,6 +62,7 @@ class Nuon2dirTests(unittest.TestCase):
     def test_literal_names_including_nested_dot_shorthand(self):
         tree = {
             "...": {"....": "dots", "*?[x]": "glob"}, "~": "tilde",
+            "*": "literal star", "[file]": "literal brackets",
             " spaced ": "space", "-dash": "dash", "back\\slash": "slash",
             '$(touch escaped);`touch escaped`': "literal",
         }
@@ -72,8 +73,11 @@ class Nuon2dirTests(unittest.TestCase):
             if isinstance(value, str):
                 self.assertEqual((self.root / name).read_text(), value)
         self.assertFalse((self.root / "escaped").exists())
+        (self.root / "unmanaged").write_text("keep")
         # Replacement must also treat glob characters and dots literally.
         self.cli(json.dumps(tree).encode())
+        self.assertEqual((self.root / "unmanaged").read_text(), "keep")
+        self.assertEqual((self.root / "*").read_text(), "literal star")
 
     def test_deep_native_tree_with_small_recursion_budget(self):
         self.native(

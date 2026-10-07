@@ -78,11 +78,13 @@ Copy `nuon2dir.nu` into a directory on `$env.NU_LIB_DIRS`, then import it:
 use nuon2dir.nu
 ```
 
-No plugin or overlay is needed. Filesystem operations use literal external
-arguments because Nushell built-ins expand dot-only names such as `...` into
-parent paths, even when passed as strings. All tree handling and validation is
-implemented in the Nu module; the fixed shell program used to write files
-receives paths as arguments, never as interpolated shell source.
+No plugin or overlay is needed. Ordinary paths use Nushell's `path type`,
+`rm --permanent`, `mkdir`, and `save --raw`. Links and execute permissions use
+external `ln` and `chmod`. Paths containing dot-only components such as `...`
+use literal external operations because Nu built-ins expand those components
+into parent paths. The fallback shell writer receives paths as arguments,
+never as interpolated shell source. Validation collects each directory's
+entries together, avoiding a growing-list copy for every member.
 
 ## JSON stdin command
 
@@ -118,6 +120,15 @@ The wrapper also passes all **68** cases in the
 [awesome-json2dir conformance suite](https://github.com/kitsunoff/awesome-json2dir/tree/main/conformance):
 **52/52 core** and **16/16 overwrite**, tested against commit
 `2ee7413a0a29d3d50b39049cb295dd2bf3b6fa77` on 2026-10-07.
+
+The extended [json2dir-tester](https://github.com/json2dir-guru/json2dir-tester)
+suite also passes **367/367** cases at its default **10-second** per-case timeout,
+tested at commit `025724d58c1f29bc94cfad0669025d1a90f06628`. For this local run,
+its implementation command invoked the shell launcher directly. Its result
+reader was adjusted to capture a mode-000 file's original permissions, briefly
+add owner read permission to inspect its contents, then restore the original
+mode. This permits running the harness without root; cases and expected
+results were unchanged. The tester requires .NET 10; the module does not.
 
 To reproduce against that snapshot (substitute an absolute wrapper path):
 
