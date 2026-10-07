@@ -176,7 +176,12 @@ class Nuon2dirTests(unittest.TestCase):
                 self.assertEqual(list(self.root.iterdir()), [])
 
     def test_cli_rejects_arguments(self):
-        self.cli(b'{}', ok=False, args=("unexpected",))
+        for args in (("unexpected",), ("--help",), ("-h",), ("--",), ("--root", "out")):
+            with self.subTest(args=args):
+                result = self.cli(b'{}', ok=False, args=args)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stderr, b'Usage: json2dir < file.json\n')
+                self.assertEqual(list(self.root.iterdir()), [])
 
 
 if __name__ == "__main__":

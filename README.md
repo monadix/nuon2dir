@@ -94,14 +94,12 @@ the current directory:
 ```
 
 Add this repository's `bin` directory to `PATH` to call it as `json2dir`.
-Keep the wrapper and module in their existing relative locations. It requires
-`env -S`, ignores Nushell configuration, rejects positional arguments, writes
-diagnostics to stderr, and returns a nonzero status on failure. For systems
-without `env -S`, invoke it explicitly:
-
-```sh
-nu --no-config-file --stdin /path/to/nuon2dir/bin/json2dir < tree.json
-```
+Keep the shell launcher, `bin/json2dir.nu`, and module in their existing relative
+locations. The launcher rejects every argument, including `--help` and `-h`,
+with a usage message on stderr and exit status 1, matching the original
+json2dir CLI. It starts Nushell without configuration and returns a nonzero
+status on failure. Native module help remains available through
+`help nuon2dir` and `nuon2dir --help`.
 
 ## Verification
 

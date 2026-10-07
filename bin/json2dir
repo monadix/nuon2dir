@@ -1,6 +1,7 @@
-#!/usr/bin/env -S nu --no-config-file --stdin
-use ../nuon2dir.nu
+#!/bin/sh
+if [ "$#" -ne 0 ]; then
+    printf '%s\n' 'Usage: json2dir < file.json' >&2
+    exit 1
+fi
 
-def main [] {
-    $in | from json --strict | nuon2dir
-}
+exec nu --no-config-file --stdin "$(dirname "$0")/json2dir.nu"
