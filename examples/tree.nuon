@@ -1,0 +1,7 @@
+{
+    greeting: "Hello, world!\n"
+    directory: { empty: {}, file: "Nested content" }
+    current: [link directory]
+    hello: [script "#!/bin/sh\necho hello\n"]
+    "blob.bin": 0x[00 01 fe ff]
+}

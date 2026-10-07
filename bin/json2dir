@@ -1,0 +1,6 @@
+#!/usr/bin/env -S nu --no-config-file --stdin
+use ../nuon2dir.nu
+
+def main [] {
+    $in | from json --strict | nuon2dir
+}
